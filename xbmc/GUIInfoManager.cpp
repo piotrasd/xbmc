@@ -60,6 +60,7 @@
 #include "URL.h"
 #include "addons/Skin.h"
 #include "boost/make_shared.hpp"
+#include "boost/lexical_cast.hpp"
 
 // stuff for current song
 #include "music/MusicInfoLoader.h"
@@ -571,14 +572,21 @@ const infomap listitem_labels[]= {{ "thumb",            LISTITEM_THUMB },
                                   { "discnumber",       LISTITEM_DISC_NUMBER },
                                   { "starttime",        LISTITEM_STARTTIME },
                                   { "endtime",          LISTITEM_ENDTIME },
+                                  { "endtime2",         LISTITEM_ENDTIME2 },
                                   { "startdate",        LISTITEM_STARTDATE },
                                   { "enddate",          LISTITEM_ENDDATE },
                                   { "nexttitle",        LISTITEM_NEXT_TITLE },
+                                  { "nexttitle2",       LISTITEM_NEXT_TITLE2 },
+                                  { "nexttitle3",       LISTITEM_NEXT_TITLE3 },
                                   { "nextgenre",        LISTITEM_NEXT_GENRE },
                                   { "nextplot",         LISTITEM_NEXT_PLOT },
                                   { "nextplotoutline",  LISTITEM_NEXT_PLOT_OUTLINE },
                                   { "nextstarttime",    LISTITEM_NEXT_STARTTIME },
+                                  { "nextstarttime2",   LISTITEM_NEXT_STARTTIME2 },
+                                  { "nextstarttime3",   LISTITEM_NEXT_STARTTIME3 },
                                   { "nextendtime",      LISTITEM_NEXT_ENDTIME },
+                                  { "nextendtime2",     LISTITEM_NEXT_ENDTIME2 },
+                                  { "nextendtime3",     LISTITEM_NEXT_ENDTIME3 },
                                   { "nextstartdate",    LISTITEM_NEXT_STARTDATE },
                                   { "nextenddate",      LISTITEM_NEXT_ENDDATE },
                                   { "channelname",      LISTITEM_CHANNEL_NAME },
@@ -877,6 +885,18 @@ int CGUIInfoManager::TranslateSingleString(const CStdString &strCondition, bool 
           return AddMultiInfo(GUIInfo(STRING_STR_RIGHT, info, compareString));
       }
       return AddMultiInfo(GUIInfo(STRING_STR, info, compareString));
+    }
+    else if (cat.name == "substring2" && cat.num_params() == 2)
+    {
+      int info = TranslateSingleString(cat.param(0), listItemDependent);
+      int info2 = TranslateSingleString(cat.param(1), listItemDependent);
+      if (info2 > 0)
+        return AddMultiInfo(GUIInfo(STRING_STR2, info, -info2));
+      // pipe our original string through the localize parsing then make it lowercase (picks up $LBRACKET etc.)
+      CStdString label = CGUIInfoLabel::GetLabel(cat.param(1));
+      StringUtils::ToLower(label);
+      int compareString = ConditionalStringParameter(label);
+      return AddMultiInfo(GUIInfo(STRING_STR2, info, compareString));
     }
   }
   else if (info.size() == 2)
@@ -2773,6 +2793,27 @@ bool CGUIInfoManager::GetMultiInfoBool(const GUIInfo &info, int contextWindow, c
             else
               bReturn = atoi( value.c_str() ) > info.GetData2();
           }
+        }
+        break;
+      case STRING_STR2:
+        {
+          CStdString compare;
+          if (info.GetData2() < 0) // info labels are stored with negative numbers
+          {
+            int info2 = -info.GetData2();
+            if (item && item->IsFileItem() && info2 >= LISTITEM_START && info2 < LISTITEM_END)
+              compare = GetItemImage((const CFileItem *)item, info2) + ";";
+            else
+              compare = GetImage(info2, contextWindow) + ";";
+          }
+          else if (info.GetData2() < (int)m_stringParameters.size())
+          { // conditional string
+            compare = m_stringParameters[info.GetData2()] + ";";
+          }
+          if (item && item->IsFileItem() && info.GetData1() >= LISTITEM_START && info.GetData1() < LISTITEM_END)
+            bReturn = GetItemImage((const CFileItem *)item, info.GetData1()).find(compare) != std::string::npos;
+          else
+            bReturn = GetImage(info.GetData1(), contextWindow).find(compare) != std::string::npos;
         }
         break;
       case STRING_STR:
@@ -4942,6 +4983,37 @@ CStdString CGUIInfoManager::GetItemLabel(const CFileItem *item, int info, std::s
     if (item->HasPVRTimerInfoTag())
       return item->GetPVRTimerInfoTag()->EndAsLocalTime().GetAsLocalizedTime("", false);
     break;
+  case LISTITEM_ENDTIME2: //anti2k
+    if (item->HasPVRChannelInfoTag())
+    {
+      const CPVRChannel *channel = item->HasPVRChannelInfoTag() ? item->GetPVRChannelInfoTag() : NULL;
+      CEpgInfoTag tag;
+      if (channel && channel->GetEPGNow(tag))
+      {
+        string c_time = CDateTime::GetCurrentDateTime().GetAsLocalizedTime("", false);
+        string e_time = tag.EndAsLocalTime().GetAsLocalizedTime("", false);
+
+        int c_time_hh = atoi(c_time.substr(0,c_time.find(":")).c_str());
+        int e_time_hh = atoi(e_time.substr(0,e_time.find(":")).c_str());
+
+        if (e_time_hh<c_time_hh)
+          e_time_hh = 24 + e_time_hh;
+
+        //int diff_time = (atoi(e_time.substr(0,e_time.find(":")).c_str())*60 + atoi(e_time.substr(e_time.find(":") + 1).c_str())) - (atoi(c_time.substr(0,c_time.find(":")).c_str())*60 + atoi(c_time.substr(c_time.find(":") + 1).c_str()));
+        int diff_time = (e_time_hh*60 + atoi(e_time.substr(e_time.find(":") + 1).c_str())) - (c_time_hh*60 + atoi(c_time.substr(c_time.find(":") + 1).c_str()));
+        if (diff_time<0)
+        {
+          return "";
+        }
+        else
+        {
+          string diff = boost::lexical_cast<string>( diff_time );
+          return diff;
+        }
+      }
+      return "";
+    }
+    break;
   case LISTITEM_STARTDATE:
     if (item->HasPVRChannelInfoTag())
     {
@@ -5033,11 +5105,43 @@ CStdString CGUIInfoManager::GetItemLabel(const CFileItem *item, int info, std::s
         return tag.StartAsLocalTime().GetAsLocalizedTime("", false);
     }
     return CDateTime::GetCurrentDateTime().GetAsLocalizedTime("", false);
+  case LISTITEM_NEXT_STARTTIME2:
+    {
+      const CPVRChannel *channel = item->HasPVRChannelInfoTag() ? item->GetPVRChannelInfoTag() : NULL;
+      CEpgInfoTag tag;
+      if (channel && channel->GetEPGNext2(tag,2))
+        return tag.StartAsLocalTime().GetAsLocalizedTime("", false);
+    }
+    return CDateTime::GetCurrentDateTime().GetAsLocalizedTime("", false);
+  case LISTITEM_NEXT_STARTTIME3:
+    {
+      const CPVRChannel *channel = item->HasPVRChannelInfoTag() ? item->GetPVRChannelInfoTag() : NULL;
+      CEpgInfoTag tag;
+      if (channel && channel->GetEPGNext2(tag,3))
+        return tag.StartAsLocalTime().GetAsLocalizedTime("", false);
+    }
+    return CDateTime::GetCurrentDateTime().GetAsLocalizedTime("", false);
   case LISTITEM_NEXT_ENDTIME:
     {
       const CPVRChannel *channel = item->HasPVRChannelInfoTag() ? item->GetPVRChannelInfoTag() : NULL;
       CEpgInfoTag tag;
       if (channel && channel->GetEPGNext(tag))
+        return tag.EndAsLocalTime().GetAsLocalizedTime("", false);
+    }
+    return CDateTime::GetCurrentDateTime().GetAsLocalizedTime("", false);
+  case LISTITEM_NEXT_ENDTIME2:
+    {
+      const CPVRChannel *channel = item->HasPVRChannelInfoTag() ? item->GetPVRChannelInfoTag() : NULL;
+      CEpgInfoTag tag;
+      if (channel && channel->GetEPGNext2(tag,2))
+        return tag.EndAsLocalTime().GetAsLocalizedTime("", false);
+    }
+    return CDateTime::GetCurrentDateTime().GetAsLocalizedTime("", false);
+  case LISTITEM_NEXT_ENDTIME3:
+    {
+      const CPVRChannel *channel = item->HasPVRChannelInfoTag() ? item->GetPVRChannelInfoTag() : NULL;
+      CEpgInfoTag tag;
+      if (channel && channel->GetEPGNext2(tag,3))
         return tag.EndAsLocalTime().GetAsLocalizedTime("", false);
     }
     return CDateTime::GetCurrentDateTime().GetAsLocalizedTime("", false);
@@ -5094,6 +5198,22 @@ CStdString CGUIInfoManager::GetItemLabel(const CFileItem *item, int info, std::s
       const CPVRChannel *channel = item->HasPVRChannelInfoTag() ? item->GetPVRChannelInfoTag() : NULL;
       CEpgInfoTag tag;
       if (channel && channel->GetEPGNext(tag))
+        return tag.Title();
+    }
+    return StringUtils::EmptyString;
+  case LISTITEM_NEXT_TITLE2:
+    {
+      const CPVRChannel *channel = item->HasPVRChannelInfoTag() ? item->GetPVRChannelInfoTag() : NULL;
+      CEpgInfoTag tag;
+      if (channel && channel->GetEPGNext2(tag,2))
+        return tag.Title();
+    }
+    return StringUtils::EmptyString;
+  case LISTITEM_NEXT_TITLE3:
+    {
+      const CPVRChannel *channel = item->HasPVRChannelInfoTag() ? item->GetPVRChannelInfoTag() : NULL;
+      CEpgInfoTag tag;
+      if (channel && channel->GetEPGNext2(tag,3))
         return tag.Title();
     }
     return StringUtils::EmptyString;

@@ -422,6 +422,7 @@ namespace PVR
      * @return The EPG tag that is active on this channel next.
      */
     bool GetEPGNext(EPG::CEpgInfoTag &tag) const;
+    bool GetEPGNext2(EPG::CEpgInfoTag &tag, int sNextEpg) const;
 
     /*!
      * @return Don't use an EPG for this channel if set to false.

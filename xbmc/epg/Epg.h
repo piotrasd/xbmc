@@ -175,6 +175,7 @@ namespace EPG
      * @return The next event.
      */
     bool InfoTagNext(CEpgInfoTag &tag);
+    bool InfoTagNext2(CEpgInfoTag &tag, int sNextEpg);
 
     /*!
      * @brief Get the event that occurs at the given time.

@@ -254,6 +254,53 @@ bool CEpg::InfoTagNext(CEpgInfoTag &tag)
   return false;
 }
 
+bool CEpg::InfoTagNext2(CEpgInfoTag &tag, int sNextEpg)
+{
+    CEpgInfoTag nowTag;
+    if (InfoTagNow(nowTag))
+    {
+      CSingleLock lock(m_critSection);
+      map<CDateTime, CEpgInfoTagPtr>::const_iterator it = m_tags.find(nowTag.StartAsUTC());
+
+      int it_size=0;
+      for (map<CDateTime, CEpgInfoTagPtr>::const_iterator it2 = m_tags.find(nowTag.StartAsUTC()); it2 != m_tags.end(); it2++)
+        it_size++;
+
+      if (it != m_tags.end() && ++it != m_tags.end())
+      {
+        if (it_size>3)
+        {
+          if (sNextEpg == 3)
+          {
+            it++;
+          }
+          it++;
+          tag = *it->second;
+          return true;
+        }
+      }
+    }
+    else if (Size() > 0)
+    {
+      /* return the first event that is in the future */
+      for (map<CDateTime, CEpgInfoTagPtr>::const_iterator it = m_tags.begin(); it != m_tags.end(); it++)
+      {
+        if (it->second->InTheFuture())
+        {
+          if (sNextEpg == 3)
+          {
+           it++;
+          }
+          it++;
+          tag = *it->second;
+          return true;
+        }
+      }
+    }
+
+  return false;
+}
+
 bool CEpg::CheckPlayingEvent(void)
 {
   bool bReturn(false);

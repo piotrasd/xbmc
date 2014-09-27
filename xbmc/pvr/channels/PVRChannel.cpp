@@ -620,6 +620,22 @@ bool CPVRChannel::GetEPGNext(CEpgInfoTag &tag) const
   return epg ? epg->InfoTagNext(tag) : false;
 }
 
+bool CPVRChannel::GetEPGNext2(CEpgInfoTag &tag, int sNextEpg) const
+{
+  CEpg *epg = GetEPG();
+
+  if (sNextEpg == 2)
+  {
+    return epg ? epg->InfoTagNext2(tag, 2) : false;
+  }
+  else if (sNextEpg == 3)
+  {
+    return epg ? epg->InfoTagNext2(tag, 3) : false;
+  }
+
+  return false;
+}
+
 bool CPVRChannel::SetEPGEnabled(bool bEPGEnabled)
 {
   CSingleLock lock(m_critSection);
